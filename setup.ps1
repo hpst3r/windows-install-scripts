@@ -52,7 +52,6 @@ param(
 
         [Boolean]$use_winget = 1,
 
-            # TODO: build array and install all desired packages from that
             [Boolean]$install_winget_dependencies = 1,
             [Array]$winget_dependencies = @("Microsoft.VCRedist.2015+.x64", "Microsoft.VCRedist.2015+.x86"),
 
@@ -72,18 +71,26 @@ param(
             [Array]$winget_networking = @("Insecure.Npcap", "WiresharkFoundation.Wireshark", "PuTTY.PuTTY"),
 
             [Boolean]$install_winget_virtualization = 1,
-            [Array]$winget_virtualization = @("Hashicorp.Vagrant")
+            [Array]$winget_virtualization = @("Hashicorp.Vagrant"),
 
             [Boolean]$install_winget_cli_tools = 1,
-            [Array]$winget_cli_tools = @("Microsoft.WindowsTerminal", "Neovim.Neovim")
+            [Array]$winget_cli_tools = @("Microsoft.WindowsTerminal", "Neovim.Neovim"),
 
             [Boolean]$install_winget_3d = 1,
-            [Array]$winget_3d = @("UltiMaker.Cura")
+            [Array]$winget_3d = @("UltiMaker.Cura"),
 
-            [Boolean]$install_adk = 0
+            [Boolean]$install_adk = 0,
             [Array]$adk = @("Microsoft.WindowsADK")
 
 )
+
+function Disable-UAC {
+    Set-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' -Name ConsentPromptBehaviorAdmin -Value 0
+}
+
+function Enable-UAC {
+    Set-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' -Name ConsentPromptBehaviorAdmin -Value 1
+}
 
 # https://learn.microsoft.com/en-us/windows/package-manager/winget/
 function Install-Winget {
@@ -171,7 +178,7 @@ function Set-RegistryValue {
 
 }
 
-Function Get-Hash {
+Function Get-StringHash {
     
     param (
         [String]$text,
@@ -272,8 +279,7 @@ if ($enable_hyperv) {
     if ($install_windows_sandbox) {
 
         Write-Host("+++ Enabling Windows Sandbox +++")
-        # this requires elevation and does not prompt
-        # TODO: fix above
+        # TODO: this requires elevation and does not prompt
         Enable-WindowsOptionalFeature -FeatureName "Containers-DisposableClientVM" -Online -NoRestart -ErrorAction Stop
 
     }
@@ -336,10 +342,9 @@ if ($install_programs) {
 
 if ($rename_computer) {
 
-    # match hash of device S/Ns in a hash table ($machines) with friendly names - not posting my S/Ns on github
-
-    # get SHA256 from the serial number
-    $device_serial = Get-Hash -text (WMIC.exe bios get serialnumber) -algorithm SHA256
+    # match hash of device S/Ns in a hash table ($machines) with friendly names
+    # wmic is gone as of 24h2? get SHA256 from the serial number
+    $device_serial = Get-StringHash -text (Get-CimInstance Win32_Bios).SerialNumber -algorithm SHA256
 
     # match in LUT for friendly name
     Rename-Computer "liam-$($machines[$device_serial])"
